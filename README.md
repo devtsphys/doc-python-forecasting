@@ -1553,5 +1553,1057 @@ model = tf.keras.models.load_model('my_forecasting_model.h5')
 - Normalize/standardize inputs
 
 
+# Pandas Time Series Forecasting Reference Card
 
+## Essential Methods Overview
+
+|Method        |Purpose                             |Returns                |Common Parameters                |
+|--------------|------------------------------------|-----------------------|---------------------------------|
+|`shift()`     |Move data by n periods              |Series/DataFrame       |`periods`, `freq`, `fill_value`  |
+|`diff()`      |Calculate difference between periods|Series/DataFrame       |`periods`                        |
+|`pct_change()`|Percentage change between periods   |Series/DataFrame       |`periods`, `fill_method`         |
+|`rolling()`   |Create rolling window               |Rolling object         |`window`, `min_periods`, `center`|
+|`expanding()` |Cumulative expanding window         |Expanding object       |`min_periods`                    |
+|`ewm()`       |Exponential weighted moving         |ExponentialMovingWindow|`span`, `alpha`, `halflife`      |
+|`resample()`  |Resample time series data           |Resampler object       |`rule` (e.g., ‘D’, ‘M’, ‘Y’)     |
+|`lag()`       |Alias for shift (not built-in)      |Series/DataFrame       |Custom implementation            |
+
+-----
+
+## 1. Shift Operations
+
+### Basic Shifting
+
+```python
+import pandas as pd
+import numpy as np
+
+# Create sample time series
+dates = pd.date_range('2024-01-01', periods=10, freq='D')
+df = pd.DataFrame({
+    'sales': [100, 120, 115, 130, 125, 140, 135, 150, 145, 160],
+    'date': dates
+})
+
+# Shift forward (lag) - previous values
+df['sales_lag1'] = df['sales'].shift(1)
+df['sales_lag2'] = df['sales'].shift(2)
+
+# Shift backward (lead) - future values
+df['sales_lead1'] = df['sales'].shift(-1)
+
+# Fill NaN values
+df['sales_lag1_filled'] = df['sales'].shift(1, fill_value=0)
+```
+
+### Creating Multiple Lags
+
+```python
+# Create multiple lag features
+for i in range(1, 8):
+    df[f'lag_{i}'] = df['sales'].shift(i)
+
+# Alternative: Using a loop with dictionary
+lags = {f'lag_{i}': df['sales'].shift(i) for i in range(1, 8)}
+df = pd.concat([df, pd.DataFrame(lags)], axis=1)
+```
+
+-----
+
+## 2. Difference Operations
+
+### First Difference
+
+```python
+# Calculate change from previous period
+df['sales_diff'] = df['sales'].diff()
+
+# Second difference (difference of differences)
+df['sales_diff2'] = df['sales'].diff().diff()
+
+# Percentage change
+df['sales_pct_change'] = df['sales'].pct_change()
+
+# Percentage change over n periods
+df['sales_pct_change_7d'] = df['sales'].pct_change(periods=7)
+```
+
+### Seasonal Difference
+
+```python
+# Remove seasonal pattern (e.g., weekly seasonality)
+df['sales_seasonal_diff'] = df['sales'].diff(7)
+
+# Remove both trend and seasonality
+df['sales_stationary'] = df['sales'].diff().diff(7)
+```
+
+-----
+
+## 3. Rolling Window Operations
+
+### Simple Rolling Statistics
+
+```python
+# Rolling mean (moving average)
+df['ma_7'] = df['sales'].rolling(window=7).mean()
+df['ma_30'] = df['sales'].rolling(window=30).mean()
+
+# Rolling sum
+df['sum_7'] = df['sales'].rolling(window=7).sum()
+
+# Rolling standard deviation
+df['std_7'] = df['sales'].rolling(window=7).std()
+
+# Rolling min/max
+df['min_7'] = df['sales'].rolling(window=7).min()
+df['max_7'] = df['sales'].rolling(window=7).max()
+```
+
+### Advanced Rolling Operations
+
+```python
+# Multiple statistics at once
+rolling_stats = df['sales'].rolling(window=7).agg(['mean', 'std', 'min', 'max'])
+
+# Custom rolling function
+df['range_7'] = df['sales'].rolling(window=7).apply(lambda x: x.max() - x.min())
+
+# Rolling with minimum periods
+df['ma_7_min3'] = df['sales'].rolling(window=7, min_periods=3).mean()
+
+# Centered rolling window
+df['ma_7_centered'] = df['sales'].rolling(window=7, center=True).mean()
+```
+
+### Rolling Correlations and Covariance
+
+```python
+# Assuming we have another feature 'temperature'
+df['temperature'] = np.random.randn(len(df)) * 10 + 20
+
+# Rolling correlation
+df['rolling_corr'] = df['sales'].rolling(window=30).corr(df['temperature'])
+
+# Rolling covariance
+df['rolling_cov'] = df['sales'].rolling(window=30).cov(df['temperature'])
+```
+
+-----
+
+## 4. Exponentially Weighted Operations
+
+### EWM Basics
+
+```python
+# Exponential moving average (EMA)
+df['ema_span10'] = df['sales'].ewm(span=10).mean()
+df['ema_span30'] = df['sales'].ewm(span=30).mean()
+
+# Using alpha parameter (0 < alpha <= 1)
+df['ema_alpha02'] = df['sales'].ewm(alpha=0.2).mean()
+
+# Using halflife
+df['ema_halflife7'] = df['sales'].ewm(halflife=7).mean()
+
+# EWM standard deviation
+df['ewm_std'] = df['sales'].ewm(span=10).std()
+```
+
+### EWM for Volatility
+
+```python
+# Returns (percentage change)
+returns = df['sales'].pct_change()
+
+# Exponentially weighted volatility
+df['volatility'] = returns.ewm(span=20).std()
+```
+
+-----
+
+## 5. Expanding Window Operations
+
+### Cumulative Statistics
+
+```python
+# Expanding mean (cumulative average)
+df['expanding_mean'] = df['sales'].expanding().mean()
+
+# Expanding sum (cumulative sum)
+df['cumsum'] = df['sales'].expanding().sum()
+# Or simply:
+df['cumsum'] = df['sales'].cumsum()
+
+# Expanding min/max
+df['expanding_min'] = df['sales'].expanding().min()
+df['expanding_max'] = df['sales'].expanding().max()
+
+# Expanding standard deviation
+df['expanding_std'] = df['sales'].expanding().std()
+```
+
+-----
+
+## 6. Resampling for Forecasting
+
+### Downsampling (Higher to Lower Frequency)
+
+```python
+# Daily to weekly
+weekly = df.set_index('date').resample('W').agg({
+    'sales': ['sum', 'mean', 'max', 'min']
+})
+
+# Daily to monthly
+monthly = df.set_index('date').resample('M').agg({
+    'sales': 'sum'
+})
+
+# Custom aggregation
+df_resampled = df.set_index('date').resample('W').agg({
+    'sales': ['sum', 'mean', lambda x: x.iloc[-1]]  # last value
+})
+```
+
+### Upsampling (Lower to Higher Frequency)
+
+```python
+# Forward fill
+upsampled = monthly.resample('D').ffill()
+
+# Backward fill
+upsampled = monthly.resample('D').bfill()
+
+# Interpolation
+upsampled = monthly.resample('D').interpolate(method='linear')
+```
+
+-----
+
+## 7. Advanced Forecasting Features
+
+### Creating Lagged Features Matrix
+
+```python
+def create_lagged_features(df, column, lags):
+    """Create multiple lagged features"""
+    lagged_df = pd.DataFrame(index=df.index)
+    for lag in lags:
+        lagged_df[f'{column}_lag{lag}'] = df[column].shift(lag)
+    return lagged_df
+
+# Usage
+lags_to_create = [1, 2, 3, 7, 14, 21, 28]
+lagged_features = create_lagged_features(df, 'sales', lags_to_create)
+df_modeling = pd.concat([df, lagged_features], axis=1)
+```
+
+### Rolling Window Features
+
+```python
+def create_rolling_features(df, column, windows):
+    """Create rolling statistics for multiple windows"""
+    rolling_df = pd.DataFrame(index=df.index)
+    for window in windows:
+        rolling_df[f'{column}_ma{window}'] = df[column].rolling(window).mean()
+        rolling_df[f'{column}_std{window}'] = df[column].rolling(window).std()
+        rolling_df[f'{column}_min{window}'] = df[column].rolling(window).min()
+        rolling_df[f'{column}_max{window}'] = df[column].rolling(window).max()
+    return rolling_df
+
+# Usage
+windows_to_create = [7, 14, 30]
+rolling_features = create_rolling_features(df, 'sales', windows_to_create)
+```
+
+### Date/Time Features
+
+```python
+# Extract temporal features
+df['year'] = df['date'].dt.year
+df['month'] = df['date'].dt.month
+df['day'] = df['date'].dt.day
+df['dayofweek'] = df['date'].dt.dayofweek
+df['quarter'] = df['date'].dt.quarter
+df['weekofyear'] = df['date'].dt.isocalendar().week
+df['is_weekend'] = df['dayofweek'].isin([5, 6]).astype(int)
+df['is_month_start'] = df['date'].dt.is_month_start.astype(int)
+df['is_month_end'] = df['date'].dt.is_month_end.astype(int)
+```
+
+### Fourier Features for Seasonality
+
+```python
+def add_fourier_features(df, date_col, period, order):
+    """Add Fourier terms for capturing seasonality"""
+    t = np.arange(len(df))
+    for i in range(1, order + 1):
+        df[f'sin_{period}_{i}'] = np.sin(2 * np.pi * i * t / period)
+        df[f'cos_{period}_{i}'] = np.cos(2 * np.pi * i * t / period)
+    return df
+
+# Weekly seasonality (period=7)
+df = add_fourier_features(df, 'date', period=7, order=3)
+```
+
+-----
+
+## 8. Window Functions for Forecasting
+
+### Rank and Quantile
+
+```python
+# Rolling rank
+df['rolling_rank'] = df['sales'].rolling(window=30).rank(pct=True)
+
+# Rolling quantile
+df['rolling_q25'] = df['sales'].rolling(window=30).quantile(0.25)
+df['rolling_median'] = df['sales'].rolling(window=30).quantile(0.50)
+df['rolling_q75'] = df['sales'].rolling(window=30).quantile(0.75)
+```
+
+### Custom Window Functions
+
+```python
+# Rolling skewness
+df['rolling_skew'] = df['sales'].rolling(window=30).skew()
+
+# Rolling kurtosis
+df['rolling_kurt'] = df['sales'].rolling(window=30).kurt()
+
+# Z-score (rolling standardization)
+df['z_score'] = (df['sales'] - df['sales'].rolling(window=30).mean()) / \
+                 df['sales'].rolling(window=30).std()
+```
+
+-----
+
+## 9. Complete Forecasting Pipeline Example
+
+```python
+import pandas as pd
+import numpy as np
+
+# Sample data
+dates = pd.date_range('2023-01-01', periods=365, freq='D')
+np.random.seed(42)
+df = pd.DataFrame({
+    'date': dates,
+    'sales': 100 + np.cumsum(np.random.randn(365)) + 
+             10 * np.sin(np.arange(365) * 2 * np.pi / 7)  # weekly pattern
+})
+
+# Set date as index
+df.set_index('date', inplace=True)
+
+# 1. Create lag features
+for i in [1, 7, 14, 28]:
+    df[f'sales_lag{i}'] = df['sales'].shift(i)
+
+# 2. Create rolling features
+for window in [7, 14, 30]:
+    df[f'sales_ma{window}'] = df['sales'].rolling(window).mean()
+    df[f'sales_std{window}'] = df['sales'].rolling(window).std()
+
+# 3. Create exponential moving averages
+df['sales_ema7'] = df['sales'].ewm(span=7).mean()
+df['sales_ema30'] = df['sales'].ewm(span=30).mean()
+
+# 4. Create difference features
+df['sales_diff1'] = df['sales'].diff()
+df['sales_diff7'] = df['sales'].diff(7)
+
+# 5. Create temporal features
+df['dayofweek'] = df.index.dayofweek
+df['month'] = df.index.month
+df['is_weekend'] = df['dayofweek'].isin([5, 6]).astype(int)
+
+# 6. Create interaction features
+df['ma7_ma30_ratio'] = df['sales_ma7'] / df['sales_ma30']
+df['price_position'] = (df['sales'] - df['sales_ma30']) / df['sales_std30']
+
+# 7. Drop NaN values for modeling
+df_model = df.dropna()
+
+print(f"Original shape: {df.shape}")
+print(f"Model shape: {df_model.shape}")
+print(f"\nFeatures created: {df_model.columns.tolist()}")
+```
+
+-----
+
+## 10. Best Practices & Tips
+
+### Handling Missing Values
+
+```python
+# Forward fill for time series
+df['sales_filled'] = df['sales'].fillna(method='ffill')
+
+# Backward fill
+df['sales_filled'] = df['sales'].fillna(method='bfill')
+
+# Interpolation
+df['sales_filled'] = df['sales'].interpolate(method='linear')
+df['sales_filled'] = df['sales'].interpolate(method='time')  # time-weighted
+```
+
+### Avoiding Data Leakage
+
+```python
+# WRONG - uses future data
+df['ma_7'] = df['sales'].rolling(window=7, center=True).mean()
+
+# CORRECT - only uses past data
+df['ma_7'] = df['sales'].rolling(window=7).mean()
+
+# When creating features, always shift target variable
+df['target'] = df['sales'].shift(-1)  # predict next day
+```
+
+### Memory Optimization
+
+```python
+# Use appropriate data types
+df['sales'] = df['sales'].astype('float32')
+df['is_weekend'] = df['is_weekend'].astype('int8')
+
+# Delete intermediate columns
+df.drop(['intermediate_col'], axis=1, inplace=True)
+```
+
+### Performance Tips
+
+```python
+# Use vectorized operations
+# SLOW
+df['feature'] = df.apply(lambda x: x['sales'] * 2, axis=1)
+
+# FAST
+df['feature'] = df['sales'] * 2
+
+# Batch processing for large datasets
+chunk_size = 10000
+for chunk in pd.read_csv('large_file.csv', chunksize=chunk_size):
+    process_chunk(chunk)
+```
+
+-----
+
+## 11. Future Dataset Creation & Target Engineering
+
+### Creating Future Datasets for Forecasting
+
+```python
+import pandas as pd
+import numpy as np
+
+# Create future dates
+last_date = df.index.max()
+future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), 
+                              periods=30, freq='D')
+
+# Initialize future dataframe
+future_df = pd.DataFrame(index=future_dates)
+
+# Add temporal features (known in advance)
+future_df['dayofweek'] = future_df.index.dayofweek
+future_df['month'] = future_df.index.month
+future_df['is_weekend'] = future_df['dayofweek'].isin([5, 6]).astype(int)
+future_df['day'] = future_df.index.day
+future_df['quarter'] = future_df.index.quarter
+
+# Add calendar features
+future_df['is_month_start'] = future_df.index.is_month_start.astype(int)
+future_df['is_month_end'] = future_df.index.is_month_end.astype(int)
+future_df['is_quarter_start'] = future_df.index.is_quarter_start.astype(int)
+future_df['is_quarter_end'] = future_df.index.is_quarter_end.astype(int)
+
+# Add cyclical encoding for temporal features
+future_df['dayofweek_sin'] = np.sin(2 * np.pi * future_df['dayofweek'] / 7)
+future_df['dayofweek_cos'] = np.cos(2 * np.pi * future_df['dayofweek'] / 7)
+future_df['month_sin'] = np.sin(2 * np.pi * future_df['month'] / 12)
+future_df['month_cos'] = np.cos(2 * np.pi * future_df['month'] / 12)
+```
+
+### Multi-Step Ahead Target Creation
+
+```python
+# Create multiple forecast horizons
+for horizon in [1, 7, 14, 30]:
+    df[f'target_h{horizon}'] = df['sales'].shift(-horizon)
+
+# Create target using rolling future mean
+df['target_next7_mean'] = df['sales'].shift(-1).rolling(window=7).mean()
+
+# Binary classification targets
+df['target_increase'] = (df['sales'].shift(-1) > df['sales']).astype(int)
+df['target_above_ma'] = (df['sales'].shift(-1) > 
+                          df['sales'].rolling(30).mean()).astype(int)
+
+# Regression target with smoothing
+df['target_smoothed'] = df['sales'].shift(-1).rolling(3, center=True).mean()
+```
+
+### Creating Cumulative Targets
+
+```python
+# Cumulative sum for next N days
+df['target_cumsum_7d'] = df['sales'][::-1].rolling(7).sum()[::-1].shift(-7)
+
+# Maximum value in next N days
+df['target_max_7d'] = df['sales'][::-1].rolling(7).max()[::-1].shift(-7)
+
+# Minimum value in next N days
+df['target_min_7d'] = df['sales'][::-1].rolling(7).min()[::-1].shift(-7)
+```
+
+-----
+
+## 12. Advanced Feature Engineering Strategies
+
+### Interaction Features
+
+```python
+# Multiplicative interactions
+df['ma7_x_dow'] = df['sales_ma7'] * df['dayofweek']
+df['lag1_x_weekend'] = df['sales_lag1'] * df['is_weekend']
+
+# Ratio features
+df['sales_to_ma7'] = df['sales'] / df['sales_ma7']
+df['sales_to_ma30'] = df['sales'] / df['sales_ma30']
+df['ma7_to_ma30'] = df['sales_ma7'] / df['sales_ma30']
+
+# Difference features
+df['diff_from_ma7'] = df['sales'] - df['sales_ma7']
+df['diff_from_ma30'] = df['sales'] - df['sales_ma30']
+```
+
+### Statistical Features
+
+```python
+# Rolling z-score
+df['zscore_30'] = (df['sales'] - df['sales'].rolling(30).mean()) / \
+                   df['sales'].rolling(30).std()
+
+# Rolling coefficient of variation
+df['cv_30'] = df['sales'].rolling(30).std() / df['sales'].rolling(30).mean()
+
+# Rolling range
+df['range_30'] = df['sales'].rolling(30).max() - df['sales'].rolling(30).min()
+
+# Percentile rank
+df['percentile_rank_30'] = df['sales'].rolling(30).apply(
+    lambda x: pd.Series(x).rank(pct=True).iloc[-1]
+)
+```
+
+### Momentum and Velocity Features
+
+```python
+# Rate of change
+df['roc_7'] = (df['sales'] - df['sales'].shift(7)) / df['sales'].shift(7)
+
+# Acceleration (second derivative)
+df['acceleration'] = df['sales'].diff().diff()
+
+# Momentum
+df['momentum_7'] = df['sales'] - df['sales'].shift(7)
+df['momentum_14'] = df['sales'] - df['sales'].shift(14)
+
+# Moving average crossover signals
+df['ma_crossover'] = (df['sales_ma7'] > df['sales_ma30']).astype(int)
+```
+
+### Volatility Features
+
+```python
+# Historical volatility
+returns = df['sales'].pct_change()
+df['volatility_7'] = returns.rolling(7).std()
+df['volatility_30'] = returns.rolling(30).std()
+
+# Parkinson volatility (using high-low)
+# Requires high and low data
+# df['parkinson_vol'] = np.sqrt(1/(4*np.log(2)) * 
+#                        np.log(df['high']/df['low'])**2)
+
+# Average True Range (ATR) approximation
+df['atr_14'] = df['sales'].diff().abs().rolling(14).mean()
+```
+
+-----
+
+## 13. Autocorrelation Analysis
+
+### Computing Autocorrelation
+
+```python
+from pandas.plotting import autocorrelation_plot
+import matplotlib.pyplot as plt
+
+# Autocorrelation function
+acf_values = [df['sales'].autocorr(lag=i) for i in range(1, 31)]
+
+# Partial autocorrelation (requires statsmodels)
+from statsmodels.tsa.stattools import acf, pacf
+
+# ACF values
+acf_vals = acf(df['sales'].dropna(), nlags=30)
+# PACF values
+pacf_vals = pacf(df['sales'].dropna(), nlags=30)
+
+# Plot autocorrelation
+autocorrelation_plot(df['sales'])
+plt.show()
+```
+
+### Creating Autocorrelation Features
+
+```python
+# Significant lag correlations as features
+significant_lags = [1, 7, 14, 28]  # Based on ACF analysis
+for lag in significant_lags:
+    df[f'sales_lag{lag}'] = df['sales'].shift(lag)
+
+# Rolling autocorrelation
+df['rolling_acf1'] = df['sales'].rolling(30).apply(
+    lambda x: x.autocorr(lag=1), raw=False
+)
+```
+
+-----
+
+## 14. Stationarity Analysis & Transformation
+
+### Testing for Stationarity
+
+```python
+from statsmodels.tsa.stattools import adfuller, kpss
+
+# Augmented Dickey-Fuller test
+def adf_test(series, name=''):
+    result = adfuller(series.dropna())
+    print(f'ADF Test for {name}')
+    print(f'ADF Statistic: {result[0]:.6f}')
+    print(f'p-value: {result[1]:.6f}')
+    print(f'Critical Values:')
+    for key, value in result[4].items():
+        print(f'\t{key}: {value:.3f}')
+    print(f'Stationary: {"Yes" if result[1] < 0.05 else "No"}\n')
+
+# KPSS test (null hypothesis: series is stationary)
+def kpss_test(series, name=''):
+    result = kpss(series.dropna(), regression='ct')
+    print(f'KPSS Test for {name}')
+    print(f'KPSS Statistic: {result[0]:.6f}')
+    print(f'p-value: {result[1]:.6f}')
+    print(f'Stationary: {"Yes" if result[1] > 0.05 else "No"}\n')
+
+# Run tests
+adf_test(df['sales'], 'Sales')
+kpss_test(df['sales'], 'Sales')
+```
+
+### Making Data Stationary
+
+```python
+# First differencing
+df['sales_diff1'] = df['sales'].diff()
+
+# Second differencing
+df['sales_diff2'] = df['sales'].diff().diff()
+
+# Log transformation (for stabilizing variance)
+df['sales_log'] = np.log(df['sales'])
+df['sales_log_diff'] = np.log(df['sales']).diff()
+
+# Box-Cox transformation
+from scipy.stats import boxcox
+df['sales_boxcox'], lambda_param = boxcox(df['sales'])
+
+# Seasonal differencing
+df['sales_seasonal_diff'] = df['sales'].diff(7)  # weekly
+
+# Combined trend and seasonal differencing
+df['sales_stationary'] = df['sales'].diff().diff(7)
+
+# Detrending using rolling mean
+df['sales_detrended'] = df['sales'] - df['sales'].rolling(30).mean()
+
+# Percentage change (removes trend and scale)
+df['sales_pct'] = df['sales'].pct_change()
+```
+
+-----
+
+## 15. Seasonality & Cyclicity Analysis
+
+### Detecting Seasonality
+
+```python
+# Simple seasonal subseries plots
+def seasonal_plot(df, column, freq='M'):
+    df_temp = df.copy()
+    df_temp['year'] = df_temp.index.year
+    df_temp['period'] = df_temp.index.month if freq == 'M' else df_temp.index.dayofweek
+    
+    pivot = df_temp.pivot_table(values=column, 
+                                 index='period', 
+                                 columns='year', 
+                                 aggfunc='mean')
+    pivot.plot(marker='o', figsize=(12, 6))
+    plt.title(f'Seasonal Plot - {column}')
+    plt.show()
+
+# Seasonal strength metric
+def seasonal_strength(series, period):
+    detrended = series - series.rolling(period, center=True).mean()
+    seasonal_component = detrended.groupby(
+        detrended.index.dayofyear if period <= 365 else detrended.index.month
+    ).transform('mean')
+    remainder = detrended - seasonal_component
+    
+    var_seasonal = seasonal_component.var()
+    var_remainder = remainder.var()
+    
+    strength = max(0, 1 - var_remainder / (var_seasonal + var_remainder))
+    return strength
+
+# Calculate seasonal strength
+strength = seasonal_strength(df['sales'], period=7)
+print(f'Seasonal Strength: {strength:.4f}')
+```
+
+### Seasonal Decomposition
+
+```python
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+# Classical decomposition (additive)
+decomposition = seasonal_decompose(df['sales'], 
+                                   model='additive', 
+                                   period=7,
+                                   extrapolate_trend='freq')
+
+# Extract components
+df['trend'] = decomposition.trend
+df['seasonal'] = decomposition.seasonal
+df['residual'] = decomposition.resid
+
+# Plot decomposition
+fig, axes = plt.subplots(4, 1, figsize=(12, 10))
+df['sales'].plot(ax=axes[0], title='Original')
+decomposition.trend.plot(ax=axes[1], title='Trend')
+decomposition.seasonal.plot(ax=axes[2], title='Seasonal')
+decomposition.resid.plot(ax=axes[3], title='Residual')
+plt.tight_layout()
+plt.show()
+
+# Multiplicative decomposition (for exponential trends)
+decomposition_mult = seasonal_decompose(df['sales'], 
+                                        model='multiplicative', 
+                                        period=7,
+                                        extrapolate_trend='freq')
+```
+
+### STL Decomposition (Seasonal-Trend decomposition using LOESS)
+
+```python
+from statsmodels.tsa.seasonal import STL
+
+# STL decomposition (more robust)
+stl = STL(df['sales'], seasonal=7, trend=15)
+result = stl.fit()
+
+df['stl_trend'] = result.trend
+df['stl_seasonal'] = result.seasonal
+df['stl_residual'] = result.resid
+
+# Plot STL decomposition
+result.plot()
+plt.show()
+```
+
+### Creating Seasonal Features
+
+```python
+# Using decomposition components as features
+df['seasonal_component'] = decomposition.seasonal
+df['trend_component'] = decomposition.trend
+df['deseasonalized'] = df['sales'] - df['seasonal_component']
+
+# Seasonal indices
+seasonal_indices = df.groupby(df.index.dayofweek)['sales'].mean()
+df['seasonal_index'] = df.index.dayofweek.map(seasonal_indices)
+
+# Seasonal adjustment
+overall_mean = df['sales'].mean()
+df['seasonal_adjusted'] = df['sales'] / (df['seasonal_index'] / overall_mean)
+```
+
+### Fourier Terms for Multiple Seasonalities
+
+```python
+def add_fourier_terms(df, periods, orders):
+    """
+    Add Fourier terms for multiple seasonal periods
+    periods: list of seasonal periods (e.g., [7, 365.25])
+    orders: list of Fourier orders for each period
+    """
+    t = np.arange(len(df))
+    
+    for period, order in zip(periods, orders):
+        for i in range(1, order + 1):
+            df[f'sin_{period}_{i}'] = np.sin(2 * np.pi * i * t / period)
+            df[f'cos_{period}_{i}'] = np.cos(2 * np.pi * i * t / period)
+    
+    return df
+
+# Add weekly and yearly seasonality
+df = add_fourier_terms(df, periods=[7, 365.25], orders=[3, 5])
+```
+
+-----
+
+## 16. Advanced Temporal Resampling
+
+### Resampling with Custom Aggregations
+
+```python
+# Multiple aggregation functions
+df_daily = df.resample('D').agg({
+    'sales': ['sum', 'mean', 'std', 'min', 'max', 'median'],
+    'temperature': ['mean', 'min', 'max']
+})
+
+# Custom aggregation functions
+def custom_agg(x):
+    return pd.Series({
+        'total': x.sum(),
+        'average': x.mean(),
+        'volatility': x.std(),
+        'range': x.max() - x.min(),
+        'last': x.iloc[-1] if len(x) > 0 else np.nan,
+        'first': x.iloc[0] if len(x) > 0 else np.nan
+    })
+
+df_weekly = df.resample('W').apply(custom_agg)
+```
+
+### Resampling with OHLC (Open-High-Low-Close)
+
+```python
+# Financial-style aggregation
+ohlc = df['sales'].resample('W').ohlc()
+print(ohlc.head())
+
+# Volume-weighted average
+df_temp = df.copy()
+df_temp['volume'] = np.random.randint(100, 1000, len(df))
+df_temp['vwap'] = (df_temp['sales'] * df_temp['volume']).resample('W').sum() / \
+                   df_temp['volume'].resample('W').sum()
+```
+
+### Rolling Resampling
+
+```python
+# Combine rolling and resampling
+df_hourly = df.resample('H').mean()  # Upsample to hourly
+df_hourly['ma_24h'] = df_hourly['sales'].rolling(24).mean()
+
+# Resample with forward-looking window
+df_weekly = df.resample('W').agg({
+    'sales': 'sum',
+    'sales_next_week': lambda x: x.iloc[0] if len(x) > 0 else np.nan
+})
+```
+
+-----
+
+## 17. Temporal Feature Engineering Patterns
+
+### Cyclical Encoding
+
+```python
+# Sine-cosine encoding for circular features
+def encode_cyclical(df, col, max_val):
+    df[f'{col}_sin'] = np.sin(2 * np.pi * df[col] / max_val)
+    df[f'{col}_cos'] = np.cos(2 * np.pi * df[col] / max_val)
+    return df
+
+df = encode_cyclical(df, 'month', 12)
+df = encode_cyclical(df, 'dayofweek', 7)
+df = encode_cyclical(df, 'hour', 24)  # if hourly data
+```
+
+### Special Periods and Events
+
+```python
+# Holidays (example with US holidays)
+from pandas.tseries.holiday import USFederalHolidayCalendar
+
+cal = USFederalHolidayCalendar()
+holidays = cal.holidays(start=df.index.min(), end=df.index.max())
+
+df['is_holiday'] = df.index.isin(holidays).astype(int)
+df['days_since_holiday'] = 0
+df['days_until_holiday'] = 0
+
+for idx in df.index:
+    past_holidays = holidays[holidays < idx]
+    future_holidays = holidays[holidays > idx]
+    
+    if len(past_holidays) > 0:
+        df.loc[idx, 'days_since_holiday'] = (idx - past_holidays[-1]).days
+    
+    if len(future_holidays) > 0:
+        df.loc[idx, 'days_until_holiday'] = (future_holidays[0] - idx).days
+
+# Pay period features (bi-weekly)
+df['is_payday'] = ((df.index.day == 15) | (df.index.day == 30)).astype(int)
+
+# Week of month
+df['week_of_month'] = (df.index.day - 1) // 7 + 1
+```
+
+### Lag Interaction Features
+
+```python
+# Lag * temporal features
+df['lag1_x_dow'] = df['sales_lag1'] * df['dayofweek']
+df['lag7_x_month'] = df['sales_lag7'] * df['month']
+
+# Rolling mean * temporal
+df['ma7_x_is_weekend'] = df['sales_ma7'] * df['is_weekend']
+
+# Conditional lags
+df['lag1_if_weekday'] = df['sales_lag1'] * (1 - df['is_weekend'])
+df['lag1_if_weekend'] = df['sales_lag1'] * df['is_weekend']
+```
+
+-----
+
+## 18. Window-Based Forecasting Features
+
+### Expanding Window Statistics by Group
+
+```python
+# Expanding mean by day of week
+df['expanding_mean_by_dow'] = df.groupby('dayofweek')['sales'].expanding().mean().reset_index(0, drop=True)
+
+# Expanding std by month
+df['expanding_std_by_month'] = df.groupby('month')['sales'].expanding().std().reset_index(0, drop=True)
+```
+
+### Custom Rolling Functions
+
+```python
+# Rolling linear trend
+def rolling_trend(x):
+    if len(x) < 2:
+        return np.nan
+    y = np.arange(len(x))
+    coeffs = np.polyfit(y, x, 1)
+    return coeffs[0]  # slope
+
+df['trend_7'] = df['sales'].rolling(7).apply(rolling_trend, raw=True)
+df['trend_30'] = df['sales'].rolling(30).apply(rolling_trend, raw=True)
+
+# Rolling peak detection
+def count_peaks(x):
+    if len(x) < 3:
+        return 0
+    return np.sum((x[1:-1] > x[:-2]) & (x[1:-1] > x[2:]))
+
+df['peaks_30'] = df['sales'].rolling(30).apply(count_peaks, raw=True)
+```
+
+-----
+
+## 19. Cross-Validation for Time Series
+
+### Time Series Split
+
+```python
+from sklearn.model_selection import TimeSeriesSplit
+
+# Create splits
+tscv = TimeSeriesSplit(n_splits=5)
+
+for train_idx, test_idx in tscv.split(df):
+    train = df.iloc[train_idx]
+    test = df.iloc[test_idx]
+    print(f'Train: {train.index.min()} to {train.index.max()}')
+    print(f'Test: {test.index.min()} to {test.index.max()}\n')
+```
+
+### Walk-Forward Validation
+
+```python
+# Manual walk-forward
+def walk_forward_validation(df, initial_train_size, step_size, horizon):
+    results = []
+    
+    for i in range(initial_train_size, len(df) - horizon, step_size):
+        train = df.iloc[:i]
+        test = df.iloc[i:i+horizon]
+        
+        # Train model here
+        # Make predictions
+        # Evaluate
+        
+        results.append({
+            'train_end': train.index[-1],
+            'test_start': test.index[0],
+            'test_end': test.index[-1]
+        })
+    
+    return pd.DataFrame(results)
+
+validation_splits = walk_forward_validation(df, 
+                                            initial_train_size=200,
+                                            step_size=30,
+                                            horizon=7)
+```
+
+-----
+
+## Common Frequency Aliases
+
+|Alias |Description  |
+|------|-------------|
+|D     |Calendar day |
+|B     |Business day |
+|W     |Weekly       |
+|M     |Month end    |
+|MS    |Month start  |
+|Q     |Quarter end  |
+|QS    |Quarter start|
+|Y     |Year end     |
+|YS    |Year start   |
+|H     |Hourly       |
+|T, min|Minutely     |
+|S     |Secondly     |
+
+-----
+
+## Quick Reference: Method Chaining
+
+```python
+# Efficient method chaining for feature engineering
+forecast_df = (df
+    .assign(
+        lag1 = lambda x: x['sales'].shift(1),
+        lag7 = lambda x: x['sales'].shift(7),
+        ma7 = lambda x: x['sales'].rolling(7).mean(),
+        ma30 = lambda x: x['sales'].rolling(30).mean(),
+        ema7 = lambda x: x['sales'].ewm(span=7).mean(),
+        diff1 = lambda x: x['sales'].diff(),
+        pct_change = lambda x: x['sales'].pct_change()
+    )
+    .dropna()
+)
+```
 
