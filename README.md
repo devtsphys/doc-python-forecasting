@@ -1553,6 +1553,1624 @@ model = tf.keras.models.load_model('my_forecasting_model.h5')
 - Normalize/standardize inputs
 
 
+# Python Forecasting Reference Card - Scikit-learn
+
+## Table of Contents
+
+1. [GLM Models (Linear & Regularized)](#glm-models)
+1. [Tree-Based Models](#tree-based-models)
+1. [Forecasting Strategies](#forecasting-strategies)
+1. [Feature Engineering for Time Series](#feature-engineering)
+1. [Complete Examples](#complete-examples)
+
+-----
+
+## GLM Models (Linear & Regularized)
+
+### Linear Models Without Regularization
+
+```python
+from sklearn.linear_model import LinearRegression
+
+# Basic Linear Regression
+lr = LinearRegression(
+    fit_intercept=True,      # Include intercept term
+    copy_X=True,             # Copy X to avoid overwriting
+    n_jobs=None              # Number of jobs for computation
+)
+
+lr.fit(X_train, y_train)
+predictions = lr.predict(X_test)
+```
+
+**Key Attributes:**
+
+- `lr.coef_` - Model coefficients
+- `lr.intercept_` - Intercept term
+- `lr.n_features_in_` - Number of features
+
+### GLM with Regularization
+
+#### Ridge Regression (L2 Regularization)
+
+```python
+from sklearn.linear_model import Ridge, RidgeCV
+
+# Ridge with fixed alpha
+ridge = Ridge(
+    alpha=1.0,              # Regularization strength
+    fit_intercept=True,
+    solver='auto',          # 'auto', 'svd', 'cholesky', 'lsqr', 'sparse_cg', 'sag', 'saga'
+    max_iter=None,
+    tol=0.001
+)
+
+# Ridge with cross-validation for alpha selection
+ridge_cv = RidgeCV(
+    alphas=(0.1, 1.0, 10.0),  # Alpha values to try
+    cv=5,                      # Cross-validation folds
+    scoring='neg_mean_squared_error'
+)
+ridge_cv.fit(X_train, y_train)
+best_alpha = ridge_cv.alpha_
+```
+
+#### Lasso Regression (L1 Regularization)
+
+```python
+from sklearn.linear_model import Lasso, LassoCV
+
+# Lasso with fixed alpha
+lasso = Lasso(
+    alpha=1.0,
+    fit_intercept=True,
+    max_iter=1000,
+    tol=0.0001,
+    selection='cyclic'      # 'cyclic' or 'random'
+)
+
+# Lasso with cross-validation
+lasso_cv = LassoCV(
+    alphas=None,            # Auto-generate if None
+    cv=5,
+    n_alphas=100,
+    max_iter=1000
+)
+```
+
+#### ElasticNet (L1 + L2 Regularization)
+
+```python
+from sklearn.linear_model import ElasticNet, ElasticNetCV
+
+# ElasticNet combines L1 and L2
+elastic = ElasticNet(
+    alpha=1.0,              # Overall regularization strength
+    l1_ratio=0.5,           # Mix: 0=Ridge, 1=Lasso, 0.5=equal mix
+    fit_intercept=True,
+    max_iter=1000
+)
+
+# ElasticNet with CV
+elastic_cv = ElasticNetCV(
+    l1_ratio=[.1, .5, .7, .9, .95, .99, 1],
+    alphas=None,
+    cv=5
+)
+```
+
+-----
+
+## Tree-Based Models
+
+### Decision Tree Regressor
+
+```python
+from sklearn.tree import DecisionTreeRegressor
+
+dt = DecisionTreeRegressor(
+    criterion='squared_error',   # 'squared_error', 'friedman_mse', 'absolute_error', 'poisson'
+    max_depth=None,              # Maximum depth of tree
+    min_samples_split=2,         # Min samples to split node
+    min_samples_leaf=1,          # Min samples in leaf
+    max_features=None,           # Features to consider for split
+    random_state=42
+)
+
+dt.fit(X_train, y_train)
+```
+
+**Key Attributes:**
+
+- `dt.feature_importances_` - Feature importance scores
+- `dt.tree_` - Underlying tree structure
+
+### Random Forest Regressor
+
+```python
+from sklearn.ensemble import RandomForestRegressor
+
+rf = RandomForestRegressor(
+    n_estimators=100,            # Number of trees
+    criterion='squared_error',
+    max_depth=None,
+    min_samples_split=2,
+    min_samples_leaf=1,
+    max_features=1.0,            # Features per split (float=proportion, int=number, 'sqrt', 'log2')
+    bootstrap=True,              # Bootstrap samples
+    oob_score=False,             # Out-of-bag score
+    n_jobs=-1,                   # Parallel jobs (-1 = all cores)
+    random_state=42
+)
+
+rf.fit(X_train, y_train)
+```
+
+### Gradient Boosting Regressor
+
+```python
+from sklearn.ensemble import GradientBoostingRegressor
+
+gb = GradientBoostingRegressor(
+    loss='squared_error',        # 'squared_error', 'absolute_error', 'huber', 'quantile'
+    learning_rate=0.1,           # Shrinkage parameter
+    n_estimators=100,
+    subsample=1.0,               # Fraction of samples for fitting
+    criterion='friedman_mse',
+    max_depth=3,
+    min_samples_split=2,
+    min_samples_leaf=1,
+    max_features=None,
+    random_state=42
+)
+
+gb.fit(X_train, y_train)
+```
+
+### Histogram-Based Gradient Boosting (Faster for large datasets)
+
+```python
+from sklearn.ensemble import HistGradientBoostingRegressor
+
+hgb = HistGradientBoostingRegressor(
+    loss='squared_error',
+    learning_rate=0.1,
+    max_iter=100,                # Number of boosting iterations
+    max_depth=None,
+    max_leaf_nodes=31,           # Maximum leaves per tree
+    min_samples_leaf=20,
+    l2_regularization=0.0,       # Ridge regularization
+    random_state=42
+)
+
+hgb.fit(X_train, y_train)
+```
+
+### Extra Trees Regressor
+
+```python
+from sklearn.ensemble import ExtraTreesRegressor
+
+et = ExtraTreesRegressor(
+    n_estimators=100,
+    criterion='squared_error',
+    max_depth=None,
+    min_samples_split=2,
+    min_samples_leaf=1,
+    max_features=1.0,
+    bootstrap=False,             # Typically False for ExtraTrees
+    n_jobs=-1,
+    random_state=42
+)
+
+et.fit(X_train, y_train)
+```
+
+-----
+
+## Model Methods Comparison Table
+
+|Method                  |GLM Models          |Tree Models            |
+|------------------------|--------------------|-----------------------|
+|**fit(X, y)**           |Train model on data |Train model on data    |
+|**predict(X)**          |Generate predictions|Generate predictions   |
+|**score(X, y)**         |R² score            |R² score               |
+|**get_params()**        |Get model parameters|Get model parameters   |
+|**set_params()**        |Set model parameters|Set model parameters   |
+|**coef_**               |✓ Coefficients      |✗ N/A                  |
+|**intercept_**          |✓ Intercept         |✗ N/A                  |
+|**feature_importances_**|✗ N/A               |✓ Feature importance   |
+|**n_features_in_**      |✓ Number of features|✓ Number of features   |
+|**oob_score_**          |✗ N/A               |✓ (RF/ET with oob=True)|
+
+-----
+
+## Forecasting Strategies
+
+### 1. Recursive Multi-Step Forecast
+
+Predict one step ahead, use prediction as input for next step.
+
+```python
+import numpy as np
+import pandas as pd
+
+def recursive_forecast(model, X_last, n_steps, lag_features):
+    """
+    Recursive multi-step forecasting.
+    
+    Parameters:
+    -----------
+    model : fitted sklearn model
+    X_last : array-like, most recent feature values
+    n_steps : int, number of steps to forecast
+    lag_features : int, number of lag features used
+    
+    Returns:
+    --------
+    predictions : array of forecasts
+    """
+    predictions = []
+    current_features = X_last.copy()
+    
+    for _ in range(n_steps):
+        # Predict next step
+        pred = model.predict(current_features.reshape(1, -1))[0]
+        predictions.append(pred)
+        
+        # Update features: shift lags and add new prediction
+        current_features = np.roll(current_features, 1)
+        current_features[0] = pred
+    
+    return np.array(predictions)
+
+# Example usage
+last_values = df[['lag_1', 'lag_2', 'lag_3']].iloc[-1].values
+forecasts = recursive_forecast(model, last_values, n_steps=10, lag_features=3)
+```
+
+### 2. Direct Multi-Step Forecast
+
+Train separate model for each forecast horizon.
+
+```python
+def train_direct_models(X, y, horizons=[1, 2, 3, 5, 10]):
+    """
+    Train separate models for each horizon.
+    
+    Parameters:
+    -----------
+    X : features
+    y : target series
+    horizons : list of forecast horizons
+    
+    Returns:
+    --------
+    models : dict of trained models
+    """
+    models = {}
+    
+    for h in horizons:
+        # Create target for horizon h
+        y_h = y.shift(-h).dropna()
+        X_h = X.iloc[:len(y_h)]
+        
+        # Train model
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model.fit(X_h, y_h)
+        models[h] = model
+    
+    return models
+
+# Example usage
+direct_models = train_direct_models(X_train, y_train, horizons=[1, 3, 7, 14])
+
+# Forecast for each horizon
+X_last = X_test.iloc[-1:].values
+forecasts = {h: model.predict(X_last)[0] for h, model in direct_models.items()}
+```
+
+### 3. Multi-Output Direct Forecast
+
+Single model predicting all horizons simultaneously.
+
+```python
+from sklearn.multioutput import MultiOutputRegressor
+
+def prepare_multi_output_data(y, horizons=[1, 2, 3, 5, 10]):
+    """
+    Create multi-output target matrix.
+    """
+    y_multi = pd.DataFrame()
+    for h in horizons:
+        y_multi[f'h_{h}'] = y.shift(-h)
+    
+    # Drop rows with NaN
+    max_horizon = max(horizons)
+    y_multi = y_multi.iloc[:-max_horizon]
+    
+    return y_multi
+
+# Prepare data
+y_multi = prepare_multi_output_data(y_train, horizons=[1, 3, 7])
+X_multi = X_train.iloc[:len(y_multi)]
+
+# Train multi-output model
+multi_model = MultiOutputRegressor(
+    RandomForestRegressor(n_estimators=100, random_state=42)
+)
+multi_model.fit(X_multi, y_multi)
+
+# Predict all horizons at once
+all_horizons = multi_model.predict(X_test.iloc[-1:].values)
+```
+
+### 4. DirRec Strategy (Hybrid)
+
+Combine direct and recursive approaches.
+
+```python
+def dirrec_forecast(X, y, model_class, horizons=[1, 3, 7, 14, 30]):
+    """
+    DirRec: Direct for short horizons, recursive for long.
+    """
+    models = {}
+    cutoff = 7  # Switch point
+    
+    # Direct models for short horizons
+    for h in [h for h in horizons if h <= cutoff]:
+        y_h = y.shift(-h).dropna()
+        X_h = X.iloc[:len(y_h)]
+        model = model_class()
+        model.fit(X_h, y_h)
+        models[h] = model
+    
+    # Recursive for longer horizons using h=cutoff model
+    base_model = models[cutoff]
+    
+    return models, base_model
+```
+
+-----
+
+## Feature Engineering for Time Series
+
+### Creating Lag Features
+
+```python
+def create_lag_features(df, target_col, lags=[1, 2, 3, 7, 14]):
+    """
+    Create lagged features from target variable.
+    """
+    for lag in lags:
+        df[f'lag_{lag}'] = df[target_col].shift(lag)
+    return df
+
+# Example
+df = create_lag_features(df, 'sales', lags=[1, 2, 3, 7, 14, 30])
+```
+
+### Rolling Window Features
+
+```python
+def create_rolling_features(df, target_col, windows=[7, 14, 30]):
+    """
+    Create rolling statistics features.
+    """
+    for window in windows:
+        df[f'rolling_mean_{window}'] = df[target_col].shift(1).rolling(window).mean()
+        df[f'rolling_std_{window}'] = df[target_col].shift(1).rolling(window).std()
+        df[f'rolling_min_{window}'] = df[target_col].shift(1).rolling(window).min()
+        df[f'rolling_max_{window}'] = df[target_col].shift(1).rolling(window).max()
+    return df
+
+df = create_rolling_features(df, 'sales', windows=[7, 14, 30])
+```
+
+### Expanding Window Features
+
+```python
+def create_expanding_features(df, target_col):
+    """
+    Create expanding window statistics.
+    """
+    df['expanding_mean'] = df[target_col].shift(1).expanding().mean()
+    df['expanding_std'] = df[target_col].shift(1).expanding().std()
+    return df
+
+df = create_expanding_features(df, 'sales')
+```
+
+### Time-Based Features
+
+```python
+def create_time_features(df, date_col):
+    """
+    Extract time-based features from datetime.
+    """
+    df['year'] = df[date_col].dt.year
+    df['month'] = df[date_col].dt.month
+    df['day'] = df[date_col].dt.day
+    df['dayofweek'] = df[date_col].dt.dayofweek
+    df['dayofyear'] = df[date_col].dt.dayofyear
+    df['weekofyear'] = df[date_col].dt.isocalendar().week
+    df['quarter'] = df[date_col].dt.quarter
+    df['is_weekend'] = (df[date_col].dt.dayofweek >= 5).astype(int)
+    df['is_month_start'] = df[date_col].dt.is_month_start.astype(int)
+    df['is_month_end'] = df[date_col].dt.is_month_end.astype(int)
+    
+    # Cyclical encoding for periodic features
+    df['month_sin'] = np.sin(2 * np.pi * df['month'] / 12)
+    df['month_cos'] = np.cos(2 * np.pi * df['month'] / 12)
+    df['day_sin'] = np.sin(2 * np.pi * df['day'] / 31)
+    df['day_cos'] = np.cos(2 * np.pi * df['day'] / 31)
+    
+    return df
+
+df = create_time_features(df, 'date')
+```
+
+### Difference Features
+
+```python
+def create_diff_features(df, target_col, periods=[1, 7, 30]):
+    """
+    Create differenced features.
+    """
+    for period in periods:
+        df[f'diff_{period}'] = df[target_col].diff(period)
+    return df
+
+df = create_diff_features(df, 'sales', periods=[1, 7, 30])
+```
+
+-----
+
+## Complete Examples
+
+### Example 1: Sales Forecasting with Ridge Regression (Recursive)
+
+```python
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import RidgeCV
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+
+# Load and prepare data
+df = pd.read_csv('sales_data.csv', parse_dates=['date'])
+df = df.sort_values('date').reset_index(drop=True)
+
+# Feature engineering
+df = create_lag_features(df, 'sales', lags=[1, 2, 3, 7, 14, 21])
+df = create_rolling_features(df, 'sales', windows=[7, 14, 30])
+df = create_time_features(df, 'date')
+
+# Remove NaN values
+df = df.dropna()
+
+# Train/test split (time series - no shuffle)
+train_size = int(0.8 * len(df))
+train = df.iloc[:train_size]
+test = df.iloc[train_size:]
+
+# Prepare features
+feature_cols = [col for col in df.columns if col not in ['date', 'sales']]
+X_train = train[feature_cols]
+y_train = train['sales']
+X_test = test[feature_cols]
+y_test = test['sales']
+
+# Scale features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Train Ridge model with CV
+ridge_cv = RidgeCV(alphas=[0.01, 0.1, 1.0, 10.0, 100.0], cv=5)
+ridge_cv.fit(X_train_scaled, y_train)
+
+print(f"Best alpha: {ridge_cv.alpha_}")
+
+# Evaluate on test set
+y_pred = ridge_cv.predict(X_test_scaled)
+mse = mean_squared_error(y_test, y_pred)
+mae = mean_absolute_error(y_test, y_pred)
+
+print(f"Test MSE: {mse:.2f}")
+print(f"Test MAE: {mae:.2f}")
+print(f"Test RMSE: {np.sqrt(mse):.2f}")
+
+# Recursive forecast for next 30 days
+X_last = X_test_scaled[-1]
+forecasts = recursive_forecast(ridge_cv, X_last, n_steps=30, lag_features=6)
+```
+
+### Example 2: Multi-Step Forecasting with Random Forest (Direct)
+
+```python
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import TimeSeriesSplit
+
+# Prepare data (same as above)
+# ...
+
+# Define forecast horizons
+horizons = [1, 3, 7, 14, 30]
+
+# Time series cross-validation
+tscv = TimeSeriesSplit(n_splits=5)
+
+# Train direct models for each horizon
+direct_models = {}
+horizon_scores = {}
+
+for h in horizons:
+    print(f"\nTraining model for horizon {h}...")
+    
+    # Create target for horizon h
+    y_h = y_train.shift(-h).iloc[:-h]
+    X_h = X_train.iloc[:len(y_h)]
+    
+    # Train Random Forest
+    rf = RandomForestRegressor(
+        n_estimators=100,
+        max_depth=10,
+        min_samples_split=5,
+        min_samples_leaf=2,
+        n_jobs=-1,
+        random_state=42
+    )
+    
+    # Cross-validation
+    cv_scores = []
+    for train_idx, val_idx in tscv.split(X_h):
+        X_cv_train, X_cv_val = X_h.iloc[train_idx], X_h.iloc[val_idx]
+        y_cv_train, y_cv_val = y_h.iloc[train_idx], y_h.iloc[val_idx]
+        
+        rf.fit(X_cv_train, y_cv_train)
+        y_cv_pred = rf.predict(X_cv_val)
+        cv_scores.append(mean_squared_error(y_cv_val, y_cv_pred))
+    
+    print(f"CV RMSE: {np.sqrt(np.mean(cv_scores)):.2f}")
+    
+    # Train on full training set
+    rf.fit(X_h, y_h)
+    direct_models[h] = rf
+    
+    # Feature importance
+    importances = pd.DataFrame({
+        'feature': feature_cols,
+        'importance': rf.feature_importances_
+    }).sort_values('importance', ascending=False)
+    
+    print(f"Top 5 features for h={h}:")
+    print(importances.head())
+
+# Generate forecasts for all horizons
+X_last = X_test.iloc[-1:].values
+forecasts = {}
+for h, model in direct_models.items():
+    forecasts[h] = model.predict(X_last)[0]
+    print(f"Forecast for t+{h}: {forecasts[h]:.2f}")
+```
+
+### Example 3: Gradient Boosting with Multi-Output (All Horizons)
+
+```python
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.multioutput import MultiOutputRegressor
+
+# Prepare multi-output targets
+horizons = [1, 3, 7, 14, 30]
+y_multi = prepare_multi_output_data(y_train, horizons)
+X_multi = X_train.iloc[:len(y_multi)]
+
+# Split for validation
+train_size = int(0.8 * len(X_multi))
+X_tr, X_val = X_multi.iloc[:train_size], X_multi.iloc[train_size:]
+y_tr, y_val = y_multi.iloc[:train_size], y_multi.iloc[train_size:]
+
+# Create multi-output model
+base_model = GradientBoostingRegressor(
+    n_estimators=100,
+    learning_rate=0.1,
+    max_depth=5,
+    min_samples_split=5,
+    subsample=0.8,
+    random_state=42
+)
+
+multi_gb = MultiOutputRegressor(base_model, n_jobs=-1)
+
+# Train
+print("Training multi-output model...")
+multi_gb.fit(X_tr, y_tr)
+
+# Evaluate on validation set
+y_val_pred = multi_gb.predict(X_val)
+
+print("\nValidation Results by Horizon:")
+for i, h in enumerate(horizons):
+    mse = mean_squared_error(y_val.iloc[:, i], y_val_pred[:, i])
+    mae = mean_absolute_error(y_val.iloc[:, i], y_val_pred[:, i])
+    print(f"Horizon {h:2d}: RMSE={np.sqrt(mse):.2f}, MAE={mae:.2f}")
+
+# Forecast all horizons for last observation
+X_last = X_test.iloc[-1:].values
+all_forecasts = multi_gb.predict(X_last)[0]
+
+forecast_df = pd.DataFrame({
+    'horizon': horizons,
+    'forecast': all_forecasts
+})
+print("\nForecasts:")
+print(forecast_df)
+```
+
+### Example 4: ElasticNet with Custom Validation
+
+```python
+from sklearn.linear_model import ElasticNetCV
+from sklearn.metrics import make_scorer
+
+# Custom scorer for time series
+def mape_score(y_true, y_pred):
+    """Mean Absolute Percentage Error"""
+    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
+# Prepare data with scaling
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# ElasticNet with CV
+elastic_cv = ElasticNetCV(
+    l1_ratio=[.1, .3, .5, .7, .9, .95, .99, 1],
+    alphas=np.logspace(-4, 1, 50),
+    cv=TimeSeriesSplit(n_splits=5),
+    max_iter=5000,
+    n_jobs=-1,
+    random_state=42
+)
+
+# Fit
+elastic_cv.fit(X_train_scaled, y_train)
+
+print(f"Best alpha: {elastic_cv.alpha_:.4f}")
+print(f"Best l1_ratio: {elastic_cv.l1_ratio_:.4f}")
+
+# Predictions
+y_pred = elastic_cv.predict(X_test_scaled)
+
+# Evaluate
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+mae = mean_absolute_error(y_test, y_pred)
+mape = mape_score(y_test, y_pred)
+
+print(f"\nTest Performance:")
+print(f"RMSE: {rmse:.2f}")
+print(f"MAE: {mae:.2f}")
+print(f"MAPE: {mape:.2f}%")
+
+# Check sparsity (feature selection via L1)
+n_nonzero = np.sum(elastic_cv.coef_ != 0)
+print(f"\nNon-zero coefficients: {n_nonzero}/{len(elastic_cv.coef_)}")
+
+# Top features
+coef_df = pd.DataFrame({
+    'feature': feature_cols,
+    'coefficient': elastic_cv.coef_
+}).sort_values('coefficient', key=abs, ascending=False)
+
+print("\nTop 10 features:")
+print(coef_df.head(10))
+```
+
+-----
+
+## Performance Metrics
+
+```python
+from sklearn.metrics import (
+    mean_squared_error,
+    mean_absolute_error,
+    r2_score,
+    median_absolute_error
+)
+
+def evaluate_forecast(y_true, y_pred):
+    """
+    Calculate comprehensive forecast metrics.
+    """
+    metrics = {
+        'MSE': mean_squared_error(y_true, y_pred),
+        'RMSE': np.sqrt(mean_squared_error(y_true, y_pred)),
+        'MAE': mean_absolute_error(y_true, y_pred),
+        'MedAE': median_absolute_error(y_true, y_pred),
+        'R2': r2_score(y_true, y_pred),
+        'MAPE': np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+    }
+    return metrics
+
+# Usage
+metrics = evaluate_forecast(y_test, y_pred)
+for name, value in metrics.items():
+    print(f"{name}: {value:.4f}")
+```
+
+-----
+
+-----
+
+## Advanced Feature Engineering & Transformation
+
+### Statistical Transformations
+
+```python
+from sklearn.preprocessing import PowerTransformer, QuantileTransformer
+from scipy import stats
+
+def apply_transformations(df, target_col, method='box-cox'):
+    """
+    Apply statistical transformations to stabilize variance.
+    """
+    df = df.copy()
+    
+    if method == 'box-cox':
+        # Box-Cox (requires positive values)
+        if (df[target_col] > 0).all():
+            transformed, lambda_param = stats.boxcox(df[target_col])
+            df[f'{target_col}_boxcox'] = transformed
+            return df, lambda_param
+    
+    elif method == 'yeo-johnson':
+        # Yeo-Johnson (works with negative values)
+        pt = PowerTransformer(method='yeo-johnson')
+        df[f'{target_col}_yeojohnson'] = pt.fit_transform(df[[target_col]])
+        return df, pt
+    
+    elif method == 'log':
+        # Log transform (add 1 to handle zeros)
+        df[f'{target_col}_log'] = np.log1p(df[target_col])
+        return df, None
+    
+    elif method == 'quantile':
+        # Quantile transformation
+        qt = QuantileTransformer(output_distribution='normal')
+        df[f'{target_col}_quantile'] = qt.fit_transform(df[[target_col]])
+        return df, qt
+    
+    return df, None
+
+# Example usage
+df_transformed, transformer = apply_transformations(df, 'sales', method='yeo-johnson')
+```
+
+### Fourier Features for Seasonality
+
+```python
+def create_fourier_features(df, date_col, period, order=3):
+    """
+    Create Fourier features to capture seasonality.
+    
+    Parameters:
+    -----------
+    period : int, seasonality period (365 for yearly, 7 for weekly)
+    order : int, number of Fourier term pairs
+    """
+    df = df.copy()
+    t = np.arange(len(df))
+    
+    for i in range(1, order + 1):
+        df[f'sin_{period}_{i}'] = np.sin(2 * np.pi * i * t / period)
+        df[f'cos_{period}_{i}'] = np.cos(2 * np.pi * i * t / period)
+    
+    return df
+
+# Example: Capture weekly and yearly seasonality
+df = create_fourier_features(df, 'date', period=7, order=3)   # Weekly
+df = create_fourier_features(df, 'date', period=365, order=5) # Yearly
+```
+
+### Interaction Features
+
+```python
+from sklearn.preprocessing import PolynomialFeatures
+
+def create_interaction_features(df, feature_cols, degree=2, interaction_only=True):
+    """
+    Create polynomial and interaction features.
+    """
+    poly = PolynomialFeatures(
+        degree=degree,
+        interaction_only=interaction_only,  # Only interactions, no x^2
+        include_bias=False
+    )
+    
+    X = df[feature_cols].values
+    X_poly = poly.fit_transform(X)
+    
+    # Get feature names
+    feature_names = poly.get_feature_names_out(feature_cols)
+    
+    # Create dataframe with new features
+    df_poly = pd.DataFrame(X_poly, columns=feature_names, index=df.index)
+    
+    return pd.concat([df, df_poly], axis=1), poly
+
+# Example: Create interactions between time features
+time_features = ['month', 'dayofweek', 'is_weekend']
+df, poly_transformer = create_interaction_features(df, time_features, degree=2)
+```
+
+### Target Encoding for Categorical Features
+
+```python
+def target_encode(df, cat_col, target_col, smoothing=1.0):
+    """
+    Target encoding with smoothing to avoid overfitting.
+    """
+    global_mean = df[target_col].mean()
+    
+    # Calculate statistics per category
+    agg = df.groupby(cat_col)[target_col].agg(['mean', 'count'])
+    
+    # Smooth the estimates
+    smoothed_mean = (
+        (agg['mean'] * agg['count'] + global_mean * smoothing) / 
+        (agg['count'] + smoothing)
+    )
+    
+    # Map to dataframe
+    df[f'{cat_col}_encoded'] = df[cat_col].map(smoothed_mean)
+    
+    # Fill unseen categories with global mean
+    df[f'{cat_col}_encoded'].fillna(global_mean, inplace=True)
+    
+    return df, smoothed_mean
+
+# Example
+df, encoding_map = target_encode(df, 'store_id', 'sales', smoothing=10)
+```
+
+### Outlier Detection and Treatment
+
+```python
+from sklearn.ensemble import IsolationForest
+
+def detect_and_handle_outliers(df, cols, method='iqr', contamination=0.1):
+    """
+    Detect and handle outliers in features.
+    """
+    df = df.copy()
+    
+    if method == 'iqr':
+        for col in cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower = Q1 - 1.5 * IQR
+            upper = Q3 + 1.5 * IQR
+            
+            # Cap outliers
+            df[f'{col}_capped'] = df[col].clip(lower, upper)
+            df[f'{col}_is_outlier'] = ((df[col] < lower) | (df[col] > upper)).astype(int)
+    
+    elif method == 'isolation_forest':
+        iso_forest = IsolationForest(contamination=contamination, random_state=42)
+        outliers = iso_forest.fit_predict(df[cols])
+        df['is_outlier'] = (outliers == -1).astype(int)
+    
+    return df
+
+# Example
+df = detect_and_handle_outliers(df, ['sales'], method='iqr')
+```
+
+### Feature Selection
+
+```python
+from sklearn.feature_selection import (
+    SelectKBest, 
+    f_regression, 
+    mutual_info_regression,
+    RFE
+)
+
+def select_features_statistical(X, y, k=10, method='f_regression'):
+    """
+    Statistical feature selection.
+    """
+    if method == 'f_regression':
+        selector = SelectKBest(score_func=f_regression, k=k)
+    elif method == 'mutual_info':
+        selector = SelectKBest(score_func=mutual_info_regression, k=k)
+    
+    X_selected = selector.fit_transform(X, y)
+    
+    # Get selected feature names
+    selected_features = X.columns[selector.get_support()].tolist()
+    
+    # Get scores
+    scores = pd.DataFrame({
+        'feature': X.columns,
+        'score': selector.scores_
+    }).sort_values('score', ascending=False)
+    
+    return X_selected, selected_features, scores
+
+def select_features_rfe(X, y, estimator, n_features=10):
+    """
+    Recursive Feature Elimination.
+    """
+    rfe = RFE(estimator=estimator, n_features_to_select=n_features)
+    X_selected = rfe.fit_transform(X, y)
+    
+    selected_features = X.columns[rfe.support_].tolist()
+    
+    rankings = pd.DataFrame({
+        'feature': X.columns,
+        'ranking': rfe.ranking_
+    }).sort_values('ranking')
+    
+    return X_selected, selected_features, rankings
+
+# Example: Statistical selection
+X_selected, selected_feats, scores = select_features_statistical(
+    X_train, y_train, k=20, method='mutual_info'
+)
+
+# Example: RFE with Random Forest
+from sklearn.ensemble import RandomForestRegressor
+rf = RandomForestRegressor(n_estimators=50, random_state=42)
+X_selected, selected_feats, rankings = select_features_rfe(
+    X_train, y_train, estimator=rf, n_features=15
+)
+```
+
+-----
+
+## Pipeline Creation
+
+### Basic Pipeline
+
+```python
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+
+# Create pipeline
+pipeline = Pipeline([
+    ('scaler', StandardScaler()),
+    ('model', Ridge(alpha=1.0))
+])
+
+# Fit and predict
+pipeline.fit(X_train, y_train)
+y_pred = pipeline.predict(X_test)
+
+# Access components
+scaler = pipeline.named_steps['scaler']
+model = pipeline.named_steps['model']
+```
+
+### Advanced Pipeline with Feature Engineering
+
+```python
+from sklearn.pipeline import Pipeline, FeatureUnion
+from sklearn.preprocessing import FunctionTransformer
+from sklearn.base import BaseEstimator, TransformerMixin
+
+class LagFeatureTransformer(BaseEstimator, TransformerMixin):
+    """Custom transformer for lag features."""
+    
+    def __init__(self, lags=[1, 2, 3]):
+        self.lags = lags
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X):
+        X_df = pd.DataFrame(X) if not isinstance(X, pd.DataFrame) else X.copy()
+        
+        for lag in self.lags:
+            X_df[f'lag_{lag}'] = X_df.iloc[:, 0].shift(lag)
+        
+        return X_df.dropna()
+
+class RollingFeatureTransformer(BaseEstimator, TransformerMixin):
+    """Custom transformer for rolling features."""
+    
+    def __init__(self, windows=[7, 14]):
+        self.windows = windows
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X):
+        X_df = pd.DataFrame(X) if not isinstance(X, pd.DataFrame) else X.copy()
+        
+        for window in self.windows:
+            X_df[f'rolling_mean_{window}'] = X_df.iloc[:, 0].shift(1).rolling(window).mean()
+            X_df[f'rolling_std_{window}'] = X_df.iloc[:, 0].shift(1).rolling(window).std()
+        
+        return X_df.dropna()
+
+# Complete pipeline with custom transformers
+forecast_pipeline = Pipeline([
+    ('lag_features', LagFeatureTransformer(lags=[1, 2, 3, 7])),
+    ('rolling_features', RollingFeatureTransformer(windows=[7, 14, 30])),
+    ('scaler', StandardScaler()),
+    ('model', RandomForestRegressor(n_estimators=100, random_state=42))
+])
+
+# Fit pipeline
+forecast_pipeline.fit(X_train, y_train)
+```
+
+### Pipeline with ColumnTransformer
+
+```python
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+
+# Define feature groups
+numeric_features = ['lag_1', 'lag_7', 'rolling_mean_7', 'temperature']
+categorical_features = ['dayofweek', 'month', 'store_id']
+
+# Create column transformer
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), numeric_features),
+        ('cat', OneHotEncoder(drop='first', sparse_output=False), categorical_features)
+    ],
+    remainder='passthrough'  # Keep other columns
+)
+
+# Complete pipeline
+pipeline = Pipeline([
+    ('preprocessor', preprocessor),
+    ('model', GradientBoostingRegressor(n_estimators=100, random_state=42))
+])
+
+# Fit and predict
+pipeline.fit(X_train, y_train)
+y_pred = pipeline.predict(X_test)
+```
+
+### Pipeline for Multi-Step Forecasting
+
+```python
+from sklearn.multioutput import MultiOutputRegressor
+
+# Pipeline for multi-output forecasting
+multi_pipeline = Pipeline([
+    ('scaler', StandardScaler()),
+    ('model', MultiOutputRegressor(
+        GradientBoostingRegressor(n_estimators=100, random_state=42)
+    ))
+])
+
+# Prepare multi-output targets
+horizons = [1, 3, 7, 14]
+y_multi = prepare_multi_output_data(y_train, horizons)
+X_multi = X_train.iloc[:len(y_multi)]
+
+# Fit
+multi_pipeline.fit(X_multi, y_multi)
+
+# Predict all horizons
+all_forecasts = multi_pipeline.predict(X_test)
+```
+
+### Hyperparameter Tuning with Pipeline
+
+```python
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+
+# Define pipeline
+pipeline = Pipeline([
+    ('scaler', StandardScaler()),
+    ('model', RandomForestRegressor(random_state=42))
+])
+
+# Define parameter grid
+param_grid = {
+    'model__n_estimators': [50, 100, 200],
+    'model__max_depth': [5, 10, 15, None],
+    'model__min_samples_split': [2, 5, 10],
+    'model__min_samples_leaf': [1, 2, 4]
+}
+
+# Time series cross-validation
+tscv = TimeSeriesSplit(n_splits=5)
+
+# Grid search
+grid_search = GridSearchCV(
+    pipeline,
+    param_grid,
+    cv=tscv,
+    scoring='neg_mean_squared_error',
+    n_jobs=-1,
+    verbose=1
+)
+
+# Fit
+grid_search.fit(X_train, y_train)
+
+# Best parameters
+print("Best parameters:", grid_search.best_params_)
+print("Best CV score:", -grid_search.best_score_)
+
+# Best model
+best_pipeline = grid_search.best_estimator_
+```
+
+### Saving and Loading Pipelines
+
+```python
+import joblib
+
+# Save pipeline
+joblib.dump(pipeline, 'forecast_pipeline.pkl')
+
+# Load pipeline
+loaded_pipeline = joblib.load('forecast_pipeline.pkl')
+
+# Use loaded pipeline
+predictions = loaded_pipeline.predict(X_new)
+```
+
+-----
+
+## Future DataFrame Preparation
+
+### Creating Future Date Range
+
+```python
+def create_future_dates(last_date, periods, freq='D'):
+    """
+    Create future date range for forecasting.
+    
+    Parameters:
+    -----------
+    last_date : datetime, last date in training data
+    periods : int, number of periods to forecast
+    freq : str, frequency ('D'=daily, 'W'=weekly, 'MS'=month start, 'H'=hourly)
+    """
+    future_dates = pd.date_range(
+        start=last_date + pd.Timedelta(days=1),
+        periods=periods,
+        freq=freq
+    )
+    
+    future_df = pd.DataFrame({'date': future_dates})
+    return future_df
+
+# Example
+last_date = df['date'].max()
+future_df = create_future_dates(last_date, periods=30, freq='D')
+```
+
+### Complete Future Feature Preparation
+
+```python
+class ForecastFeaturePreparator:
+    """
+    Complete feature preparation for future forecasts.
+    """
+    
+    def __init__(self, historical_df, date_col='date', target_col='sales'):
+        self.historical_df = historical_df.copy()
+        self.date_col = date_col
+        self.target_col = target_col
+        self.last_date = historical_df[date_col].max()
+        self.last_values = historical_df[target_col].values
+    
+    def prepare_future_features(self, n_periods, exog_future=None):
+        """
+        Prepare complete feature set for future predictions.
+        
+        Parameters:
+        -----------
+        n_periods : int, forecast horizon
+        exog_future : DataFrame, future exogenous variables (optional)
+        """
+        # Create future dates
+        future_dates = pd.date_range(
+            start=self.last_date + pd.Timedelta(days=1),
+            periods=n_periods,
+            freq='D'
+        )
+        
+        future_df = pd.DataFrame({self.date_col: future_dates})
+        
+        # 1. Time-based features
+        future_df = create_time_features(future_df, self.date_col)
+        
+        # 2. Lag features (from historical data)
+        future_df = self._create_future_lags(future_df, lags=[1, 2, 3, 7, 14, 21, 30])
+        
+        # 3. Rolling features (from historical data)
+        future_df = self._create_future_rolling(
+            future_df, 
+            windows=[7, 14, 30]
+        )
+        
+        # 4. Fourier features for seasonality
+        future_df = create_fourier_features(future_df, self.date_col, period=7, order=3)
+        future_df = create_fourier_features(future_df, self.date_col, period=365, order=5)
+        
+        # 5. Add exogenous variables if provided
+        if exog_future is not None:
+            future_df = pd.concat([future_df, exog_future.reset_index(drop=True)], axis=1)
+        
+        return future_df
+    
+    def _create_future_lags(self, future_df, lags):
+        """Create lag features for future periods."""
+        n_future = len(future_df)
+        n_hist = len(self.last_values)
+        
+        # Combine historical and future (future values unknown, set to NaN)
+        combined = np.concatenate([self.last_values, np.full(n_future, np.nan)])
+        
+        for lag in lags:
+            if lag < n_hist:
+                # Can calculate from historical data
+                future_df[f'lag_{lag}'] = combined[n_hist - lag : n_hist - lag + n_future]
+            else:
+                # Not enough history
+                future_df[f'lag_{lag}'] = np.nan
+        
+        return future_df
+    
+    def _create_future_rolling(self, future_df, windows):
+        """Create rolling features for future periods."""
+        for window in windows:
+            if window <= len(self.last_values):
+                # Calculate from historical data
+                recent_values = self.last_values[-window:]
+                future_df[f'rolling_mean_{window}'] = recent_values.mean()
+                future_df[f'rolling_std_{window}'] = recent_values.std()
+                future_df[f'rolling_min_{window}'] = recent_values.min()
+                future_df[f'rolling_max_{window}'] = recent_values.max()
+            else:
+                future_df[f'rolling_mean_{window}'] = np.nan
+                future_df[f'rolling_std_{window}'] = np.nan
+        
+        return future_df
+
+# Example usage
+preparator = ForecastFeaturePreparator(df, date_col='date', target_col='sales')
+
+# Prepare features for next 30 days
+future_features = preparator.prepare_future_features(n_periods=30)
+
+# With exogenous variables (e.g., planned promotions, weather forecasts)
+future_exog = pd.DataFrame({
+    'temperature': np.random.randn(30) * 5 + 20,
+    'is_promotion': [1, 1, 0, 0, 0] * 6
+})
+
+future_features = preparator.prepare_future_features(
+    n_periods=30, 
+    exog_future=future_exog
+)
+```
+
+### Recursive Forecast with Feature Updates
+
+```python
+def recursive_forecast_with_features(model, preparator, scaler, feature_cols, n_steps):
+    """
+    Recursive forecasting with proper feature updating.
+    """
+    forecasts = []
+    current_hist = preparator.historical_df.copy()
+    
+    for step in range(n_steps):
+        # Prepare features for next step
+        temp_preparator = ForecastFeaturePreparator(
+            current_hist,
+            date_col='date',
+            target_col='sales'
+        )
+        
+        future_feats = temp_preparator.prepare_future_features(n_periods=1)
+        
+        # Select and scale features
+        X_next = future_feats[feature_cols].fillna(0)  # Handle NaN
+        X_next_scaled = scaler.transform(X_next)
+        
+        # Predict
+        pred = model.predict(X_next_scaled)[0]
+        forecasts.append(pred)
+        
+        # Update historical data with prediction
+        new_row = future_feats.iloc[0:1].copy()
+        new_row['sales'] = pred
+        current_hist = pd.concat([current_hist, new_row], ignore_index=True)
+    
+    return np.array(forecasts)
+
+# Example usage
+forecasts = recursive_forecast_with_features(
+    model=pipeline.named_steps['model'],
+    preparator=preparator,
+    scaler=scaler,
+    feature_cols=feature_cols,
+    n_steps=30
+)
+```
+
+### Best Practices for Future Features
+
+```python
+def validate_future_features(future_df, required_features):
+    """
+    Validate that all required features are present and handle missing values.
+    """
+    # Check for missing features
+    missing_features = set(required_features) - set(future_df.columns)
+    if missing_features:
+        raise ValueError(f"Missing features: {missing_features}")
+    
+    # Check for NaN values
+    nan_counts = future_df[required_features].isna().sum()
+    if nan_counts.any():
+        print("Warning: NaN values found in features:")
+        print(nan_counts[nan_counts > 0])
+        
+        # Strategy: fill with historical mean or median
+        for col in nan_counts[nan_counts > 0].index:
+            future_df[col].fillna(future_df[col].median(), inplace=True)
+    
+    return future_df
+
+# Example
+future_df = validate_future_features(future_df, feature_cols)
+```
+
+-----
+
+## Evaluation and Visualization with Plotly
+
+### Comprehensive Evaluation Metrics
+
+```python
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+def comprehensive_evaluation(y_true, y_pred, dates=None):
+    """
+    Calculate and visualize comprehensive forecast metrics.
+    """
+    from sklearn.metrics import (
+        mean_squared_error,
+        mean_absolute_error,
+        mean_absolute_percentage_error,
+        r2_score
+    )
+    
+    # Calculate metrics
+    metrics = {
+        'MSE': mean_squared_error(y_true, y_pred),
+        'RMSE': np.sqrt(mean_squared_error(y_true, y_pred)),
+        'MAE': mean_absolute_error(y_true, y_pred),
+        'MAPE': mean_absolute_percentage_error(y_true, y_pred) * 100,
+        'R²': r2_score(y_true, y_pred),
+        'Max Error': np.max(np.abs(y_true - y_pred)),
+        'Mean Error': np.mean(y_pred - y_true)
+    }
+    
+    # Calculate residuals
+    residuals = y_true - y_pred
+    
+    # Create results dataframe
+    if dates is not None:
+        results_df = pd.DataFrame({
+            'date': dates,
+            'actual': y_true,
+            'predicted': y_pred,
+            'residual': residuals,
+            'abs_error': np.abs(residuals),
+            'pct_error': (residuals / y_true) * 100
+        })
+    else:
+        results_df = pd.DataFrame({
+            'actual': y_true,
+            'predicted': y_pred,
+            'residual': residuals,
+            'abs_error': np.abs(residuals),
+            'pct_error': (residuals / y_true) * 100
+        })
+    
+    return metrics, results_df
+
+# Example usage
+metrics, results_df = comprehensive_evaluation(
+    y_test.values,
+    y_pred,
+    dates=test['date'].values if 'date' in test.columns else None
+)
+
+print("Forecast Metrics:")
+for metric, value in metrics.items():
+    print(f"{metric:15s}: {value:.4f}")
+```
+
+### Plotly Visualization Functions
+
+#### 1. Actual vs Predicted Plot
+
+```python
+def plot_forecast_vs_actual(results_df, title='Forecast vs Actual'):
+    """
+    Plot actual vs predicted values with Plotly.
+    """
+    fig = go.Figure()
+    
+    # Actual values
+    fig.add_trace(go.Scatter(
+        x=results_df['date'] if 'date' in results_df.columns else results_df.index,
+        y=results_df['actual'],
+        mode='lines',
+        name='Actual',
+        line=dict(color='#1f77b4', width=2)
+    ))
+    
+    # Predicted values
+    fig.add_trace(go.Scatter(
+        x=results_df['date'] if 'date' in results_df.columns else results_df.index,
+        y=results_df['predicted'],
+        mode='lines',
+        name='Predicted',
+        line=dict(color='#ff7f0e', width=2, dash='dash')
+    ))
+    
+    fig.update_layout(
+        title=title,
+        xaxis_title='Date' if 'date' in results_df.columns else 'Index',
+        yaxis_title='Value',
+        hovermode='x unified',
+        template='plotly_white',
+        height=500
+    )
+    
+    return fig
+
+# Example
+fig = plot_forecast_vs_actual(results_df)
+fig.show()
+```
+
+#### 2. Residual Analysis Plot
+
+```python
+def plot_residual_analysis(results_df):
+    """
+    Create comprehensive residual analysis plots.
+    """
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=(
+            'Residuals Over Time',
+            'Residual Distribution',
+            'Actual vs Predicted',
+            'Residuals vs Predicted'
+        )
+    )
+    
+    # 1. Residuals over time
+    fig.add_trace(
+        go.Scatter(
+            x=results_df['date'] if 'date' in results_df.columns else results_df.index,
+            y=results_df['residual'],
+            mode='markers',
+            name='Residuals',
+            marker=dict(color='#2ca02c', size=4)
+        ),
+        row=1, col=1
+    )
+    fig.add_hline(y=0, line_dash="dash", line_color="red", row=1, col=1)
+    
+    # 2. Residual distribution (histogram)
+    fig.add_trace(
+        go.Histogram(
+            x=results_df['residual'],
+            name='Distribution',
+            nbinsx=30,
+            marker=dict(color='#9467bd')
+        ),
+        row=1, col=2
+    )
+    
+    # 3. Actual vs Predicted scatter
+    fig.add_trace(
+        go.Scatter(
+            x=results_df['actual'],
+            y=results_df['predicted'],
+            mode='markers',
+            name='Data Points',
+            marker=dict(color='#8c564b', size=6, opacity=0.6)
+        ),
+        row=2, col=1
+    )
+    # Perfect prediction line
+    min_val = min(results_df['actual'].min(), results_df['predicted'].min())
+    max_val = max(results_df['actual'].max(), results_df['predicted'].max())
+    fig.add_trace(
+        go.Scatter(
+            x=[min_val, max_val],
+            y=[min_val, max_val],
+            mode='lines',
+            name='Perfect Fit',
+            line=dict(color='red', dash='dash')
+        ),
+        row=2, col=1
+    )
+    
+    # 4. Residuals vs Predicted
+    fig.add_trace(
+        go.Scatter(
+            x=results_df['predicted'],
+            y=results_df['residual'],
+            mode='markers',
+            name='Residuals',
+            marker=dict(color='#e377c2', size=6, opacity=0.6)
+        ),
+        row=2, col=2
+    )
+    fig.add_hline(y=0, line_dash="dash", line_color="red", row=2, col=2)
+    
+    fig.update_layout(
+        height=800,
+        showlegend=False,
+        template='plotly_white',
+        title_text="Residual Analysis"
+    )
+    
+    fig.update_xaxes(title_text="Date/Index", row=1, col=1)
+    fig.update_xaxes(title_text="Residual Value", row=1, col=2)
+    fig.update_xaxes(title_text="Actual Value", row=2, col=1)
+    fig.update_xaxes(title_text="Predicted Value", row=2, col=2)
+    
+    fig.update_yaxes(title_text="Residual", row=1, col=1)
+    fig.update_yaxes(title_text="Frequency", row=1, col=2)
+    fig.update_yaxes(title_text="Predicted Value", row=2, col=1)
+    fig.update_yaxes(title_text="Residual", row=2, col=2)
+    
+    return fig
+
+# Example
+fig = plot_residual_analysis(results_df)
+fig.show()
+```
+
+#### 3. Error Metrics Over Time
+
+```python
+def plot_error_metrics_over_time(results_df, window=7):
+    """
+    Plot rolling error metrics over time.
+    """
+    # Calculate rolling metrics
+    results_df['rolling_mae'] = results_df['abs_error'].rolling(window).mean()
+    results_df['rolling_mape'] = results_df['pct_error'].abs().rolling(window).mean()
+    
+    fig = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=(
+            f'Rolling MAE (window={window})',
+            f'Rolling MAPE (window={window})'
+        ),
+        vertical_spacing=0.12
+```
+
+
 # Pandas Time Series Forecasting Reference Card
 
 ## Essential Methods Overview
